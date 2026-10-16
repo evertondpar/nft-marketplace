@@ -1,33 +1,37 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { useState, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { CollectorForm } from "@/components/checkout/CollectorForm";
 import { CartSummary } from "@/components/checkout/CartSummary";
 import { SuccessModal } from "@/components/checkout/SuccessModal";
-import type { CartItem } from "@/types";
+import type { OrderSnapshot } from "@/types";
 
 export const Route = createFileRoute("/checkout")({
-  // Proteção da rota: verifica se existe token no localStorage antes de carregar
   beforeLoad: () => {
-    const token = localStorage.getItem("auth_token");
-    if (!token) {
-      // Redireciona para o início se o utilizador não estiver autenticado
-      throw redirect({
-        to: "/",
-        search: { redirect: "/checkout" },
-      });
+    if (!localStorage.getItem("auth_token")) {
+      throw redirect({ to: "/" });
     }
   },
   component: CheckoutPage,
 });
 
 function CheckoutPage() {
-  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
-  const [selectedWallet, setSelectedWallet] = useState("MetaMask");
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
-  // Buscar itens do carrinho para exibir na lateral direita
-  const { data: cartItems } = useQuery({
+  // Ref para guardar a chave de idempotência desta tentativa de checkout
+  const idempotencyKey = useRef(crypto.randomUUID());
+
+  const [selectedWallet, setSelectedWallet] = useState("MetaMask");
+  const [couponCode, setCouponCode] = useState("");
+  const [couponError, setCouponError] = useState<string | null>(null);
+
+  const [confirmedOrder, setConfirmedOrder] = useState<OrderSnapshot | null>(
+    null,
+  );
+  // 1. Buscar itens do carrinho
+  const { data: cartItems = [] } = useQuery({
     queryKey: ["cart"],
     queryFn: async () => {
       const res = await api.get("/cart");
@@ -35,18 +39,69 @@ function CheckoutPage() {
     },
   });
 
-  const subtotal =
-    cartItems?.reduce(
-      (acc: number, item: CartItem) =>
-        acc + parseFloat(item.price) * item.quantity,
-      0,
-    ) || 0;
-  const networkFee = 0.016;
-  const total = subtotal + networkFee;
+  // 2. Buscar Cotação em Tempo Real
+  const { data: quote, isLoading: isLoadingQuote } = useQuery({
+    queryKey: ["quote", cartItems, couponCode],
+    queryFn: async () => {
+      if (cartItems.length === 0) return null;
+      try {
+        const res = await api.post("/quote", {
+          items: cartItems,
+          coupon: couponCode,
+        });
+        setCouponError(null);
+        return res.data;
+      } catch (err: any) {
+        setCouponError(err?.response?.data?.message || "Erro ao calcular");
+        setCouponCode(""); // Reseta o cupom em caso de erro
+        return null;
+      }
+    },
+    enabled: cartItems.length > 0,
+  });
 
+  // 3. Mutation de Pedido com Chave de Idempotência
+  const orderMutation = useMutation({
+    mutationFn: async () => {
+      const res = await api.post(
+        "/orders",
+        {
+          items: cartItems,
+          quote: quote,
+          wallet: selectedWallet,
+        },
+        {
+          headers: {
+            "Idempotency-Key": idempotencyKey.current, // Garante segurança em falhas/retries
+          },
+        },
+      );
+      return res.data.order;
+    },
+    onSuccess: (orderSnapshot) => {
+      setConfirmedOrder(orderSnapshot);
+      queryClient.invalidateQueries({ queryKey: ["cart"] }); // Esvazia o carrinho visualmente
+    },
+    onError: () => {
+      alert(
+        "Houve um erro de conexão. Tente novamente (a cobrança está protegida).",
+      );
+    },
+  });
+
+  const handleApplyCoupon = (code: string) => {
+    setCouponCode(code);
+  };
+
+  // 4. Validação e Submissão
   const handleConfirmPurchase = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSuccessModalOpen(true);
+
+    // Opcional: validações manuais antes de disparar (além do `required` do HTML)
+    if (cartItems.length === 0) return;
+    if (!quote) return;
+
+    orderMutation.mutate();
   };
 
   return (
@@ -60,24 +115,30 @@ function CheckoutPage() {
         className="grid grid-cols-1 lg:grid-cols-12 gap-12"
       >
         <CollectorForm />
+
         <CartSummary
           cartItems={cartItems}
-          subtotal={subtotal}
-          networkFee={networkFee}
-          total={total}
+          quote={quote}
+          isLoadingQuote={isLoadingQuote}
+          couponError={couponError}
+          onApplyCoupon={handleApplyCoupon}
           selectedWallet={selectedWallet}
           setSelectedWallet={setSelectedWallet}
+          isSubmitting={orderMutation.isPending}
         />
       </form>
 
-      <SuccessModal
-        isOpen={isSuccessModalOpen}
-        onClose={() => setIsSuccessModalOpen(false)}
-        cartItems={cartItems}
-        total={total}
-        networkFee={networkFee}
-        selectedWallet={selectedWallet}
-      />
+      {/* MODAL DE SUCESSO: Renderizado EXCLUSIVAMENTE com os dados do confirmedOrder (Snapshot) */}
+      {confirmedOrder && (
+        <SuccessModal
+          isOpen={!!confirmedOrder}
+          onClose={() => {
+            setConfirmedOrder(null);
+            navigate({ to: "/" });
+          }}
+          orderSnapshot={confirmedOrder} // Repassa apenas o Recibo Congelado
+        />
+      )}
     </main>
   );
 }

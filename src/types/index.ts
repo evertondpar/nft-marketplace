@@ -70,3 +70,32 @@ export interface HomeSearch {
   sort?: "recent" | "price_asc" | "price_desc";
   page?: number;
 }
+
+export interface OrderItem {
+  id: string;
+  name: string;
+  price: string;
+  currency: string;
+  image: string;
+  quantity: number;
+}
+
+export interface OrderSnapshot {
+  id: string; // Hash simulado da transação (ex: 0xA91F..E82C)
+  idempotencyKey: string;
+  items: OrderItem[];
+  subtotal: number;
+  discount: number;
+  networkFee: number;
+  total: number;
+  wallet: string;
+  createdAt: string; // ISO String
+}
+
+export interface Quote {
+  subtotal: number;
+  discount: number;
+  networkFee: number;
+  total: number;
+  validCoupon: string | null;
+}

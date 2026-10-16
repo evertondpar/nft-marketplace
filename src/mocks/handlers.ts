@@ -8,6 +8,7 @@ import type {
   UpdateProfileRequestBody,
   ChangePasswordRequestBody,
   WalletItem,
+  OrderSnapshot,
 } from "@/types";
 
 export const handlers = [
@@ -333,5 +334,79 @@ export const handlers = [
 
     db.write({ favorites: currentFavs });
     return HttpResponse.json({ favorites: currentFavs });
+  }),
+
+  http.post("/api/quote", async ({ request }) => {
+    await delay(300);
+    const { coupon, items } = (await request.json()) as any;
+
+    const subtotal = items.reduce(
+      (acc: number, item: any) => acc + parseFloat(item.price) * item.quantity,
+      0,
+    );
+    let discount = 0;
+
+    // Simulação de validação de cupom ("KURIO20" dá 20% de desconto)
+    if (coupon) {
+      if (coupon.toUpperCase() === "KURIO20") {
+        discount = subtotal * 0.2;
+      } else {
+        return new HttpResponse(
+          JSON.stringify({ message: "Cupom inválido ou expirado" }),
+          { status: 400, headers: { "Content-Type": "application/json" } },
+        );
+      }
+    }
+
+    const networkFee = 0.016; // Taxa de rede fixa para a simulação
+    const total = subtotal - discount + networkFee;
+
+    return HttpResponse.json({
+      subtotal,
+      discount,
+      networkFee,
+      total,
+      validCoupon: coupon ? coupon.toUpperCase() : null,
+    });
+  }),
+
+  // Criação do Pedido com Chave de Idempotência e Snapshot
+  http.post("/api/orders", async ({ request }) => {
+    await delay(800); // Simulando o tempo de processamento de pagamento
+    const idempotencyKey = request.headers.get("Idempotency-Key");
+    const body = (await request.json()) as any;
+    const data = db.read();
+    const currentOrders = (data as any).orders || [];
+
+    // 1. VERIFICAÇÃO DE IDEMPOTÊNCIA
+    // Se a chave já existir, devolve o pedido exato que já foi criado, prevenindo duplicidade
+    const existingOrder = currentOrders.find(
+      (o: OrderSnapshot) => o.idempotencyKey === idempotencyKey,
+    );
+    if (existingOrder) {
+      return HttpResponse.json({ order: existingOrder });
+    }
+
+    // 2. CRIAÇÃO DO SNAPSHOT IMUTÁVEL
+    // Copiamos os valores exatos deste milissegundo para o recibo
+    const newOrder = {
+      id: `0x${Math.random().toString(16).substr(2, 8).toUpperCase()}`, // Simulando hash de transação
+      idempotencyKey,
+      items: body.items,
+      subtotal: body.quote.subtotal,
+      discount: body.quote.discount,
+      networkFee: body.quote.networkFee,
+      total: body.quote.total,
+      wallet: body.wallet,
+      createdAt: new Date().toISOString(),
+    };
+
+    // 3. PERSISTE E LIMPA O CARRINHO
+    db.write({
+      orders: [...currentOrders, newOrder],
+      cart: [], // Limpa o carrinho após a compra com sucesso
+    } as any);
+
+    return HttpResponse.json({ order: newOrder });
   }),
 ];
