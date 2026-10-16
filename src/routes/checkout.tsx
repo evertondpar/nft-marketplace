@@ -7,6 +7,7 @@ import { CartSummary } from "@/components/checkout/CartSummary";
 import { SuccessModal } from "@/components/checkout/SuccessModal";
 import type { OrderSnapshot, Quote } from "@/types";
 import { useSocket } from "@/hooks/useSocket";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/checkout")({
   beforeLoad: () => {
@@ -28,7 +29,7 @@ function CheckoutPage() {
   const [selectedWallet, setSelectedWallet] = useState("MetaMask");
   const [couponCode, setCouponCode] = useState("");
   const [couponError, setCouponError] = useState<string | null>(null);
-
+  const { logout } = useAuth();
   const [confirmedOrder, setConfirmedOrder] = useState<OrderSnapshot | null>(
     null,
   );
@@ -142,9 +143,26 @@ function CheckoutPage() {
         queryClient.setQueryData(["order", orderSnapshot.id], orderSnapshot);
       }
     },
-    onError: () => {
+    onError: (error: any) => {
+      const status = error?.response?.status;
+      const message = error?.response?.data?.message;
+
+      if (status === 401) {
+        alert(message || "Sua sessão expirou.");
+        // localStorage.removeItem("auth_token");
+        logout();
+        navigate({ to: "/" });
+        return;
+      }
+
+      if (status === 409) {
+        alert(`Ops! ${message}`);
+        queryClient.invalidateQueries({ queryKey: ["cart"] }); // Re-busca o carrinho sem o item vendido
+        return;
+      }
+
       alert(
-        "Houve um erro de conexão. Tente novamente (a cobrança está protegida).",
+        message || "Houve um erro no servidor. A cobrança não foi realizada.",
       );
     },
   });

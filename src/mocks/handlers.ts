@@ -10,6 +10,7 @@ import type {
   WalletItem,
   OrderSnapshot,
 } from "@/types";
+import { scenarioManager } from "./scenarios";
 
 export const handlers = [
   // ---------------------------------------------------------------------------
@@ -373,6 +374,53 @@ export const handlers = [
   // Criação do Pedido com Chave de Idempotência e Snapshot
   http.post("/api/orders", async ({ request }) => {
     await delay(800); // Simulando o tempo de processamento de pagamento
+    const scenario = scenarioManager.getScenario();
+
+    // 1. CENÁRIO: Lentidão Extrema (Delay de 5 segundos)
+    if (scenario === "slow_network") {
+      console.warn(
+        "⚠️ [MSW Fixture] Simulando lentidão extrema de rede (5s)...",
+      );
+      await delay(5000);
+    }
+
+    // 2. CENÁRIO: Erro Interno do Servidor (HTTP 500)
+    if (scenario === "server_error") {
+      console.warn("⚠️ [MSW Fixture] Simulando erro HTTP 500...");
+      return new HttpResponse(
+        JSON.stringify({
+          message:
+            "Erro interno no nó da Blockchain. Tente novamente mais tarde.",
+        }),
+        { status: 500, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    // 3. CENÁRIO: Sessão Expirada (HTTP 401 Unauthorized)
+    if (scenario === "session_expired") {
+      console.warn("⚠️ [MSW Fixture] Simulando sessão expirada (HTTP 401)...");
+      return new HttpResponse(
+        JSON.stringify({
+          message: "Sua sessão expirou. Faça login novamente para prosseguir.",
+        }),
+        { status: 401, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    // 4. CENÁRIO: Conflito de Estoque (HTTP 409 Conflict)
+    if (scenario === "stock_conflict") {
+      console.warn(
+        "⚠️ [MSW Fixture] Simulando conflito de estoque/compra simultânea...",
+      );
+      return new HttpResponse(
+        JSON.stringify({
+          code: "NFT_ALREADY_SOLD",
+          message:
+            "Um ou mais NFTs do seu carrinho já foram comprados por outro colecionador!",
+        }),
+        { status: 409, headers: { "Content-Type": "application/json" } },
+      );
+    }
     const idempotencyKey = request.headers.get("Idempotency-Key");
     const body = (await request.json()) as any;
     const data = db.read();
