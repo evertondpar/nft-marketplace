@@ -8,18 +8,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import {
   User,
-  Wallet,
-  Activity,
+  MapPin,
+  ShoppingCart,
   Heart,
   Tag,
   Download,
-  HelpCircle,
+  AlertTriangle,
   LogOut,
   Eye,
   EyeOff,
   Check,
   Loader2,
   Circle,
+  Image as ImageIcon,
 } from "lucide-react";
 import type { UserProfile, WalletItem } from "@/types";
 import { useQueryClient } from "@tanstack/react-query";
@@ -33,6 +34,58 @@ export const Route = createFileRoute("/profile")({
   },
   component: ProfilePage,
 });
+
+const inputClass =
+  "w-full bg-secondary/30 border border-border rounded-md px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary";
+const walletInputClass =
+  "w-full bg-secondary/20 border border-border rounded px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary";
+const navItemBase =
+  "w-full flex items-center gap-3 px-3 py-2.5 transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary border-l-4";
+const disabledItemClass =
+  "flex items-center gap-3 px-3 py-2.5 border-l-4 border-transparent text-primary cursor-not-allowed";
+
+interface PasswordFieldProps {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+// Campo de senha com botão próprio de exibir/ocultar (um por campo, como no Figma)
+function PasswordField({ id, label, value, onChange }: PasswordFieldProps) {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <div>
+      <label htmlFor={id} className="text-foreground block mb-2">
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          id={id}
+          type={visible ? "text" : "password"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className={`${inputClass} pr-10`}
+        />
+        <button
+          type="button"
+          onClick={() => setVisible((v) => !v)}
+          aria-label={
+            visible ? `Ocultar ${label.toLowerCase()}` : `Exibir ${label.toLowerCase()}`
+          }
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+        >
+          {visible ? (
+            <EyeOff className="w-4 h-4" />
+          ) : (
+            <Eye className="w-4 h-4" />
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function ProfilePage() {
   const queryClient = useQueryClient();
@@ -51,9 +104,7 @@ function ProfilePage() {
   const [email, setEmail] = useState(user?.email || "");
   const [ensName, setEnsName] = useState("");
   const [walletAlias, setWalletAlias] = useState("");
-  const [avatar, setAvatar] = useState(
-    user?.avatar || "https://i.pravatar.cc/150?img=3",
-  );
+  const [avatar, setAvatar] = useState(user?.avatar || "");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState(false);
 
@@ -61,10 +112,7 @@ function ProfilePage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPasswords, setShowPasswords] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [passwordSuccess, setPasswordSuccess] = useState(false);
-  const [isSavingPassword, setIsSavingPassword] = useState(false);
 
   // Estados do Formulário de Carteira
   const [editingWalletId, setEditingWalletId] = useState<string | null>(null);
@@ -78,26 +126,44 @@ function ProfilePage() {
   const [walletReferral, setWalletReferral] = useState("");
   const [walletEmail, setWalletEmail] = useState("");
   const [walletEnsName, setWalletEnsName] = useState("");
-  const [walletSuccess, setWalletSuccess] = useState(false);
+  const [walletSuccess, setWalletSuccess] = useState<
+    "created" | "updated" | null
+  >(null);
 
   useEffect(() => {
     const handleFillUserData = (userData: UserProfile) => {
       setDisplayName(userData.name || "");
       setUsername(userData.username || "");
       setEmail(userData.email || "");
-      setAvatar(userData.avatar || "https://i.pravatar.cc/150?img=3");
+      setAvatar(userData.avatar || "");
     };
     if (user) {
       handleFillUserData(user);
     }
   }, [user]);
 
-  // CRUD: Salvar dados do Perfil
+  // CRUD: Salvar dados do Perfil (e senha, quando preenchida)
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSavingProfile(true);
+    setPasswordError(null);
     setProfileSuccess(false);
 
+    const wantsPasswordChange = Boolean(
+      currentPassword || newPassword || confirmPassword,
+    );
+
+    if (wantsPasswordChange) {
+      if (!currentPassword || !newPassword) {
+        setPasswordError("Informe a senha atual e a nova senha.");
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        setPasswordError("As senhas não coincidem.");
+        return;
+      }
+    }
+
+    setIsSavingProfile(true);
     try {
       await api.put("/profile", {
         name: displayName,
@@ -106,40 +172,27 @@ function ProfilePage() {
         avatar,
       });
       await queryClient.invalidateQueries({ queryKey: ["auth-user"] });
+
+      if (wantsPasswordChange) {
+        try {
+          await api.put("/profile/password", { currentPassword, newPassword });
+          setCurrentPassword("");
+          setNewPassword("");
+          setConfirmPassword("");
+        } catch (err: any) {
+          setPasswordError(
+            err?.response?.data?.message || "Erro ao alterar senha.",
+          );
+          return;
+        }
+      }
+
       setProfileSuccess(true);
       setTimeout(() => setProfileSuccess(false), 3000);
     } catch {
       alert("Erro ao atualizar perfil.");
     } finally {
       setIsSavingProfile(false);
-    }
-  };
-
-  // CRUD: Alterar Senha
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPasswordError(null);
-    setPasswordSuccess(false);
-
-    if (newPassword !== confirmPassword) {
-      setPasswordError("As senhas não coincidem.");
-      return;
-    }
-
-    setIsSavingPassword(true);
-    try {
-      await api.put("/profile/password", { currentPassword, newPassword });
-      setPasswordSuccess(true);
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setTimeout(() => setPasswordSuccess(false), 3000);
-    } catch (err: any) {
-      setPasswordError(
-        err?.response?.data?.message || "Erro ao alterar senha.",
-      );
-    } finally {
-      setIsSavingPassword(false);
     }
   };
 
@@ -188,8 +241,8 @@ function ProfilePage() {
 
     try {
       await saveWallet(duplicatedWallet);
-      setWalletSuccess(true);
-      setTimeout(() => setWalletSuccess(false), 3000);
+      setWalletSuccess("created");
+      setTimeout(() => setWalletSuccess(null), 3000);
     } catch {
       alert("Erro ao duplicar carteira principal.");
     }
@@ -198,6 +251,8 @@ function ProfilePage() {
   const handleSaveWallet = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!walletAddress || !walletNetwork) return;
+
+    const wasEditing = Boolean(editingWalletId);
 
     // Se estiver a editar, preserva a flag isPrimary; senão, a primeira é sempre principal
     const isPrimaryFlag = editingWalletId
@@ -214,9 +269,9 @@ function ProfilePage() {
 
     try {
       await saveWallet(walletPayload);
-      setWalletSuccess(true);
+      setWalletSuccess(wasEditing ? "updated" : "created");
       handleAddNewWallet(); // Limpa o formulário após salvar com sucesso
-      setTimeout(() => setWalletSuccess(false), 3000);
+      setTimeout(() => setWalletSuccess(null), 3000);
     } catch {
       alert("Erro ao salvar carteira.");
     }
@@ -264,16 +319,16 @@ function ProfilePage() {
         {/* SIDEBAR ESQUERDA */}
         <aside
           aria-label="Menu de navegação do perfil"
-          className="md:col-span-3 bg-secondary/20 border border-border/60 rounded-xl p-4 h-fit"
+          className="md:col-span-3 bg-secondary/20 border border-border/60 h-fit"
         >
-          <h2 className="text-base font-bold text-foreground px-3 py-2 mb-2">
+          <h2 className="text-base font-bold text-foreground px-3 pt-3 pb-2">
             Meu perfil
           </h2>
 
           <nav
             role="tablist"
             aria-label="Abas do painel do perfil"
-            className="space-y-1 text-xs"
+            className="text-xs"
           >
             <button
               type="button"
@@ -282,10 +337,10 @@ function ProfilePage() {
               aria-controls="panel-profile"
               aria-selected={activeTab === "profile"}
               onClick={() => setActiveTab("profile")}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+              className={`${navItemBase} ${
                 activeTab === "profile"
-                  ? "bg-primary/10 text-primary font-bold"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/40"
+                  ? "border-primary bg-secondary/40 text-primary"
+                  : "border-transparent text-primary hover:bg-secondary/40"
               }`}
             >
               <User className="w-4 h-4" />
@@ -299,65 +354,46 @@ function ProfilePage() {
               aria-controls="panel-wallets"
               aria-selected={activeTab === "wallets"}
               onClick={() => setActiveTab("wallets")}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+              className={`${navItemBase} ${
                 activeTab === "wallets"
-                  ? "bg-primary/10 text-primary font-bold"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/40"
+                  ? "border-primary bg-secondary/40 text-primary"
+                  : "border-transparent text-primary hover:bg-secondary/40"
               }`}
             >
-              <Wallet className="w-4 h-4" />
+              <MapPin className="w-4 h-4" />
               <span>Carteiras</span>
             </button>
 
             {/* Links Desativados */}
-            <div
-              role="group"
-              aria-label="Recursos em breve"
-              className="pt-2 border-t border-border/40 space-y-1 opacity-60"
-            >
-              <div
-                aria-disabled="true"
-                className="flex items-center gap-3 px-3 py-2 text-muted-foreground cursor-not-allowed"
-              >
-                <Activity className="w-4 h-4" />
+            <div role="group" aria-label="Recursos em breve">
+              <div aria-disabled="true" className={disabledItemClass}>
+                <ShoppingCart className="w-4 h-4" />
                 <span>Atividade</span>
               </div>
-              <div
-                aria-disabled="true"
-                className="flex items-center gap-3 px-3 py-2 text-muted-foreground cursor-not-allowed"
-              >
+              <div aria-disabled="true" className={disabledItemClass}>
                 <Heart className="w-4 h-4" />
                 <span>Lista de interesse</span>
               </div>
-              <div
-                aria-disabled="true"
-                className="flex items-center gap-3 px-3 py-2 text-muted-foreground cursor-not-allowed"
-              >
+              <div aria-disabled="true" className={disabledItemClass}>
                 <Tag className="w-4 h-4" />
                 <span>Ofertas</span>
               </div>
-              <div
-                aria-disabled="true"
-                className="flex items-center gap-3 px-3 py-2 text-muted-foreground cursor-not-allowed"
-              >
+              <div aria-disabled="true" className={disabledItemClass}>
                 <Download className="w-4 h-4" />
                 <span>Arquivos baixados</span>
               </div>
-              <div
-                aria-disabled="true"
-                className="flex items-center gap-3 px-3 py-2 text-muted-foreground cursor-not-allowed"
-              >
-                <HelpCircle className="w-4 h-4" />
+              <div aria-disabled="true" className={disabledItemClass}>
+                <AlertTriangle className="w-4 h-4" />
                 <span>Suporte</span>
               </div>
             </div>
 
-            <div className="pt-4 border-t border-border/40">
+            <div className="border-t border-border/60">
               <button
                 type="button"
                 onClick={() => logout()}
                 aria-label="Encerrar sessão da conta"
-                className="w-full flex items-center gap-3 px-3 py-2 text-xs text-muted-foreground hover:text-red-500 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold text-primary hover:bg-secondary/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <LogOut className="w-4 h-4" />
                 <span>Sair</span>
@@ -378,16 +414,17 @@ function ProfilePage() {
               aria-labelledby="tab-profile"
               className="space-y-8 animate-fadeIn"
             >
-              <h1 className="text-xl font-bold text-foreground">
+              <h1 className="text-sm font-bold text-foreground">
                 Perfil do colecionador
               </h1>
 
               <form onSubmit={handleSaveProfile} className="space-y-6 text-xs">
+                {/* Linha 1 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label
                       htmlFor="profile-display-name"
-                      className="text-muted-foreground block mb-2"
+                      className="text-foreground block mb-2"
                     >
                       Nome de exibição<span className="text-primary">*</span>
                     </label>
@@ -398,13 +435,13 @@ function ProfilePage() {
                       aria-required="true"
                       value={displayName}
                       onChange={(e) => setDisplayName(e.target.value)}
-                      className="w-full bg-secondary/30 border border-border rounded-md px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      className={inputClass}
                     />
                   </div>
                   <div>
                     <label
                       htmlFor="profile-username"
-                      className="text-muted-foreground block mb-2"
+                      className="text-foreground block mb-2"
                     >
                       Nome de usuário<span className="text-primary">*</span>
                     </label>
@@ -415,16 +452,17 @@ function ProfilePage() {
                       aria-required="true"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
-                      className="w-full bg-secondary/30 border border-border rounded-md px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      className={inputClass}
                     />
                   </div>
                 </div>
 
+                {/* Linha 2 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label
                       htmlFor="profile-email"
-                      className="text-muted-foreground block mb-2"
+                      className="text-foreground block mb-2"
                     >
                       E-mail<span className="text-primary">*</span>
                     </label>
@@ -435,69 +473,75 @@ function ProfilePage() {
                       aria-required="true"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full bg-secondary/30 border border-border rounded-md px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      className={inputClass}
                     />
                   </div>
 
                   <div>
                     <label
                       htmlFor="profile-ens-name"
-                      className="text-muted-foreground block mb-2"
+                      className="text-foreground block mb-2"
                     >
-                      Nome ENS (opcional)
+                      Nome ENS <span className="text-primary">*</span>
                     </label>
                     <div className="flex gap-2">
-                      <span
-                        aria-hidden="true"
-                        className="bg-secondary border border-border rounded-md px-3 py-2.5 text-muted-foreground flex items-center"
+                      <select
+                        aria-label="Extensão ENS"
+                        className="w-24 bg-secondary/30 border border-border rounded-md px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary appearance-none"
                       >
-                        .eth
-                      </span>
-                      <div className="relative flex-1">
-                        <input
-                          id="profile-ens-name"
-                          type="text"
-                          value={ensName}
-                          onChange={(e) => setEnsName(e.target.value)}
-                          className="w-full bg-secondary/30 border border-border rounded-md px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                        />
-                        <img
-                          src={avatar}
-                          alt="Avatar do ENS"
-                          className="absolute right-2 top-1.5 w-7 h-7 rounded-full object-cover border border-primary"
-                        />
-                      </div>
+                        <option>.eth</option>
+                      </select>
+                      <input
+                        id="profile-ens-name"
+                        type="text"
+                        required
+                        aria-required="true"
+                        value={ensName}
+                        onChange={(e) => setEnsName(e.target.value)}
+                        className={`flex-1 ${inputClass}`}
+                      />
                     </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                {/* Linha 3 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                   <div>
                     <label
                       htmlFor="profile-wallet-alias"
-                      className="text-muted-foreground block mb-2"
+                      className="text-foreground block mb-2"
                     >
-                      Apelido da carteira (opcional)
+                      Apelido da carteira
+                      <span className="text-primary">*</span>
                     </label>
                     <input
                       id="profile-wallet-alias"
                       type="text"
+                      required
+                      aria-required="true"
                       value={walletAlias}
                       onChange={(e) => setWalletAlias(e.target.value)}
-                      className="w-full bg-secondary/30 border border-border rounded-md px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      className={inputClass}
                     />
                   </div>
 
                   <div>
-                    <span className="text-muted-foreground block mb-2">
-                      Avatar
-                    </span>
+                    <span className="text-foreground block mb-2">Avatar</span>
                     <div className="flex items-center gap-3">
-                      <img
-                        src={avatar}
-                        alt="Foto de perfil do colecionador"
-                        className="w-9 h-9 rounded-full object-cover border border-primary"
-                      />
+                      <div className="w-12 h-12 rounded-full bg-secondary/40 border border-border flex items-center justify-center overflow-hidden shrink-0">
+                        {avatar ? (
+                          <img
+                            src={avatar}
+                            alt="Foto de perfil do colecionador"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <ImageIcon
+                            aria-label="Sem foto de perfil"
+                            className="w-5 h-5 text-primary"
+                          />
+                        )}
+                      </div>
                       <Button
                         type="button"
                         onClick={() =>
@@ -506,20 +550,57 @@ function ProfilePage() {
                           )
                         }
                         aria-label="Gerar avatar aleatório"
-                        className="bg-primary/20 text-primary hover:bg-primary/30 text-xs py-2 px-4 focus-visible:ring-2 focus-visible:ring-primary"
+                        className="bg-primary text-primary-foreground font-bold text-xs py-2 px-6 focus-visible:ring-2 focus-visible:ring-primary"
                       >
                         Alterar
                       </Button>
                       <button
                         type="button"
-                        onClick={() =>
-                          setAvatar("https://i.pravatar.cc/150?img=1")
-                        }
-                        aria-label="Restaurar avatar padrão"
-                        className="text-muted-foreground hover:text-red-500 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded px-1"
+                        onClick={() => setAvatar("")}
+                        aria-label="Remover avatar"
+                        className="text-foreground hover:text-red-500 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded px-1"
                       >
                         Remover
                       </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ALTERAR SENHA */}
+                <div className="pt-4 space-y-4">
+                  <h2 className="text-sm font-bold text-foreground">
+                    Alterar senha
+                  </h2>
+
+                  {passwordError && (
+                    <div
+                      role="alert"
+                      className="p-3 bg-red-500/10 border border-red-500/30 rounded text-red-500 text-xs font-mono"
+                    >
+                      {passwordError}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <PasswordField
+                        id="current-password"
+                        label="Senha atual"
+                        value={currentPassword}
+                        onChange={setCurrentPassword}
+                      />
+                      <PasswordField
+                        id="new-password"
+                        label="Nova senha"
+                        value={newPassword}
+                        onChange={setNewPassword}
+                      />
+                      <PasswordField
+                        id="confirm-password"
+                        label="Confirmar nova senha"
+                        value={confirmPassword}
+                        onChange={setConfirmPassword}
+                      />
                     </div>
                   </div>
                 </div>
@@ -534,7 +615,7 @@ function ProfilePage() {
                     {isSavingProfile ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
-                      "Salvar Alterações"
+                      "Salvar"
                     )}
                   </Button>
                   {profileSuccess && (
@@ -548,124 +629,6 @@ function ProfilePage() {
                   )}
                 </div>
               </form>
-
-              {/* FORMULÁRIO DE ALTERAR SENHA */}
-              <div className="pt-8 border-t border-border/40 space-y-4">
-                <h2 className="text-sm font-bold text-foreground">
-                  Alterar senha
-                </h2>
-
-                {passwordError && (
-                  <div
-                    role="alert"
-                    className="p-3 bg-red-500/10 border border-red-500/30 rounded text-red-500 text-xs font-mono"
-                  >
-                    {passwordError}
-                  </div>
-                )}
-
-                <form
-                  onSubmit={handleChangePassword}
-                  className="max-w-md space-y-4 text-xs"
-                >
-                  <div>
-                    <label
-                      htmlFor="current-password"
-                      className="text-muted-foreground block mb-2"
-                    >
-                      Senha atual<span className="text-primary">*</span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        id="current-password"
-                        type={showPasswords ? "text" : "password"}
-                        required
-                        aria-required="true"
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        className="w-full bg-secondary/30 border border-border rounded-md px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPasswords(!showPasswords)}
-                        aria-label={
-                          showPasswords
-                            ? "Ocultar texto das senhas"
-                            : "Exibir texto das senhas"
-                        }
-                        className="absolute right-3 top-3 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
-                      >
-                        {showPasswords ? (
-                          <EyeOff className="w-4 h-4" />
-                        ) : (
-                          <Eye className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="new-password"
-                      className="text-muted-foreground block mb-2"
-                    >
-                      Nova senha<span className="text-primary">*</span>
-                    </label>
-                    <input
-                      id="new-password"
-                      type={showPasswords ? "text" : "password"}
-                      required
-                      aria-required="true"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      className="w-full bg-secondary/30 border border-border rounded-md px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="confirm-password"
-                      className="text-muted-foreground block mb-2"
-                    >
-                      Confirmar nova senha
-                      <span className="text-primary">*</span>
-                    </label>
-                    <input
-                      id="confirm-password"
-                      type={showPasswords ? "text" : "password"}
-                      required
-                      aria-required="true"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="w-full bg-secondary/30 border border-border rounded-md px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-4 pt-2">
-                    <Button
-                      type="submit"
-                      disabled={isSavingPassword}
-                      aria-busy={isSavingPassword}
-                      className="bg-primary text-primary-foreground font-bold px-8 py-5 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                    >
-                      {isSavingPassword ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        "Atualizar Senha"
-                      )}
-                    </Button>
-                    {passwordSuccess && (
-                      <span
-                        role="status"
-                        className="text-xs text-primary flex items-center gap-1"
-                      >
-                        <Check className="w-4 h-4" /> Senha alterada com
-                        sucesso!
-                      </span>
-                    )}
-                  </div>
-                </form>
-              </div>
             </div>
           )}
 
@@ -680,9 +643,9 @@ function ProfilePage() {
               className="space-y-10 animate-fadeIn"
             >
               {/* CABEÇALHO COM BOTÃO "ADICIONAR" */}
-              <div className="flex justify-between items-start border-b border-border/40 pb-4">
+              <div className="flex justify-between items-start">
                 <div>
-                  <h1 className="text-xl font-bold text-foreground">
+                  <h1 className="text-sm font-bold text-foreground">
                     Carteira principal
                   </h1>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -711,7 +674,7 @@ function ProfilePage() {
                   <div>
                     <label
                       htmlFor="wallet-display-name"
-                      className="text-muted-foreground block mb-2"
+                      className="text-foreground block mb-2"
                     >
                       Nome de exibição<span className="text-primary">*</span>
                     </label>
@@ -722,13 +685,13 @@ function ProfilePage() {
                       aria-required="true"
                       value={walletDisplayName}
                       onChange={(e) => setWalletDisplayName(e.target.value)}
-                      className="w-full bg-secondary/20 border border-border rounded px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                      className={walletInputClass}
                     />
                   </div>
                   <div>
                     <label
                       htmlFor="wallet-alias"
-                      className="text-muted-foreground block mb-2"
+                      className="text-foreground block mb-2"
                     >
                       Apelido da carteira<span className="text-primary">*</span>
                     </label>
@@ -739,7 +702,7 @@ function ProfilePage() {
                       aria-required="true"
                       value={walletNameAlias}
                       onChange={(e) => setWalletNameAlias(e.target.value)}
-                      className="w-full bg-secondary/20 border border-border rounded px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                      className={walletInputClass}
                     />
                   </div>
                 </div>
@@ -749,7 +712,7 @@ function ProfilePage() {
                   <div>
                     <label
                       htmlFor="wallet-network-select"
-                      className="text-muted-foreground block mb-2"
+                      className="text-foreground block mb-2"
                     >
                       Rede <span className="text-primary">*</span>
                     </label>
@@ -759,7 +722,7 @@ function ProfilePage() {
                       aria-required="true"
                       value={walletNetwork}
                       onChange={(e) => setWalletNetwork(e.target.value)}
-                      className="w-full bg-secondary/20 border border-border rounded px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary appearance-none"
+                      className={`${walletInputClass} appearance-none`}
                     >
                       <option value="">Selecione uma rede</option>
                       <option value="Ethereum">Ethereum</option>
@@ -770,7 +733,7 @@ function ProfilePage() {
                   <div>
                     <label
                       htmlFor="wallet-profile-name"
-                      className="text-muted-foreground block mb-2"
+                      className="text-foreground block mb-2"
                     >
                       Nome do perfil<span className="text-primary">*</span>
                     </label>
@@ -781,7 +744,7 @@ function ProfilePage() {
                       aria-required="true"
                       value={walletProfileName}
                       onChange={(e) => setWalletProfileName(e.target.value)}
-                      className="w-full bg-secondary/20 border border-border rounded px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                      className={walletInputClass}
                     />
                   </div>
                 </div>
@@ -791,7 +754,7 @@ function ProfilePage() {
                   <div>
                     <label
                       htmlFor="wallet-address-input"
-                      className="text-muted-foreground block mb-2"
+                      className="text-foreground block mb-2"
                     >
                       Endereço da carteira
                       <span className="text-primary">*</span>
@@ -804,22 +767,23 @@ function ProfilePage() {
                       placeholder="Endereço 0x da carteira"
                       value={walletAddress}
                       onChange={(e) => setWalletAddress(e.target.value)}
-                      className="w-full bg-secondary/20 border border-border rounded px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary font-mono"
+                      className={`${walletInputClass} font-mono`}
                     />
                   </div>
                   <div>
-                    <label
-                      htmlFor="wallet-ens-secondary"
-                      className="text-muted-foreground block mb-2"
-                    >
+                    {/* No Figma este campo não tem rótulo visível, apenas placeholder.
+                        O rótulo fica oculto para leitores de tela e o espaçador mantém o alinhamento. */}
+                    <label htmlFor="wallet-ens-secondary" className="sr-only">
                       ENS ou carteira secundária (opcional)
                     </label>
+                    <span aria-hidden="true" className="block h-4 mb-2" />
                     <input
                       id="wallet-ens-secondary"
                       type="text"
+                      placeholder="ENS ou carteira secundária (opcional)"
                       value={walletEnsSecondary}
                       onChange={(e) => setWalletEnsSecondary(e.target.value)}
-                      className="w-full bg-secondary/20 border border-border rounded px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                      className={walletInputClass}
                     />
                   </div>
                 </div>
@@ -829,7 +793,7 @@ function ProfilePage() {
                   <div>
                     <label
                       htmlFor="wallet-type-select"
-                      className="text-muted-foreground block mb-2"
+                      className="text-foreground block mb-2"
                     >
                       Tipo de carteira<span className="text-primary">*</span>
                     </label>
@@ -839,7 +803,7 @@ function ProfilePage() {
                       aria-required="true"
                       value={walletType}
                       onChange={(e) => setWalletType(e.target.value)}
-                      className="w-full bg-secondary/20 border border-border rounded px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary appearance-none"
+                      className={`${walletInputClass} appearance-none`}
                     >
                       <option value="">Selecione uma carteira</option>
                       <option value="MetaMask">MetaMask</option>
@@ -850,7 +814,7 @@ function ProfilePage() {
                   <div>
                     <label
                       htmlFor="wallet-referral"
-                      className="text-muted-foreground block mb-2"
+                      className="text-foreground block mb-2"
                     >
                       Código de indicação<span className="text-primary">*</span>
                     </label>
@@ -861,7 +825,7 @@ function ProfilePage() {
                       aria-required="true"
                       value={walletReferral}
                       onChange={(e) => setWalletReferral(e.target.value)}
-                      className="w-full bg-secondary/20 border border-border rounded px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                      className={walletInputClass}
                     />
                   </div>
                 </div>
@@ -871,7 +835,7 @@ function ProfilePage() {
                   <div>
                     <label
                       htmlFor="wallet-email-input"
-                      className="text-muted-foreground block mb-2"
+                      className="text-foreground block mb-2"
                     >
                       E-mail<span className="text-primary">*</span>
                     </label>
@@ -882,13 +846,13 @@ function ProfilePage() {
                       aria-required="true"
                       value={walletEmail}
                       onChange={(e) => setWalletEmail(e.target.value)}
-                      className="w-full bg-secondary/20 border border-border rounded px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                      className={walletInputClass}
                     />
                   </div>
                   <div>
                     <label
                       htmlFor="wallet-ens-name-input"
-                      className="text-muted-foreground block mb-2"
+                      className="text-foreground block mb-2"
                     >
                       Nome ENS <span className="text-primary">*</span>
                     </label>
@@ -906,7 +870,7 @@ function ProfilePage() {
                         aria-required="true"
                         value={walletEnsName}
                         onChange={(e) => setWalletEnsName(e.target.value)}
-                        className="flex-1 bg-secondary/20 border border-border rounded px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                        className={`flex-1 ${walletInputClass}`}
                       />
                     </div>
                   </div>
@@ -932,7 +896,7 @@ function ProfilePage() {
                       className="text-xs text-primary flex items-center gap-1"
                     >
                       <Check className="w-4 h-4" />
-                      {editingWalletId
+                      {walletSuccess === "updated"
                         ? "Carteira atualizada!"
                         : "Carteira adicionada!"}
                     </span>
@@ -941,9 +905,9 @@ function ProfilePage() {
               </form>
 
               {/* SESSÃO: CARTEIRA SECUNDÁRIA (CLONAR) */}
-              <div className="pt-8 border-t border-border/40 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+              <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                 <div>
-                  <h2 className="text-base font-bold text-foreground">
+                  <h2 className="text-sm font-bold text-foreground">
                     Carteira secundária
                   </h2>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -954,8 +918,8 @@ function ProfilePage() {
                 </div>
                 <div className="flex items-center gap-3 text-xs">
                   <div className="flex items-center gap-2" aria-hidden="true">
-                    <Circle className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">
+                    <Circle className="w-4 h-4 text-primary" />
+                    <span className="text-foreground">
                       Igual à carteira principal
                     </span>
                   </div>
@@ -963,7 +927,7 @@ function ProfilePage() {
                     type="button"
                     onClick={handleDuplicatePrimary}
                     aria-label="Adicionar uma cópia da sua carteira principal como secundária"
-                    className="text-primary font-bold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded px-1"
+                    className="text-primary font-bold text-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded px-1"
                   >
                     Adicionar
                   </button>
@@ -971,15 +935,11 @@ function ProfilePage() {
               </div>
 
               {/* LISTA DE CARTEIRAS CADASTRADAS (CLICÁVEIS PARA EDITAR) */}
-              <div className="pt-8 border-t border-border/40 space-y-4">
-                <h2 className="text-base font-bold text-foreground">
-                  Carteiras cadastradas ({wallets.length})
-                </h2>
-                {wallets.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">
-                    Nenhuma carteira salva até o momento.
-                  </p>
-                ) : (
+              {wallets.length > 0 && (
+                <div className="pt-8 border-t border-border/40 space-y-4">
+                  <h2 className="text-sm font-bold text-foreground">
+                    Carteiras cadastradas ({wallets.length})
+                  </h2>
                   <div
                     role="region"
                     aria-label="Lista de carteiras salvas para edição"
@@ -1031,8 +991,8 @@ function ProfilePage() {
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           )}
         </section>
