@@ -90,6 +90,8 @@ export interface OrderSnapshot {
   total: number;
   wallet: string;
   createdAt: string; // ISO String
+  status: OrderStatus;
+  version: number;
 }
 
 export interface Quote {
@@ -98,4 +100,15 @@ export interface Quote {
   networkFee: number;
   total: number;
   validCoupon: string | null;
+}
+
+export type OrderStatus = "pending" | "confirmed" | "rejected";
+
+export interface OrderUpdatedEvent {
+  orderId: string;
+  userId: string;
+  status: OrderStatus;
+  version: number; // Timestamp (Date.now()) ou contador incremental
+  snapshot?: OrderSnapshot;
+  errorReason?: string;
 }

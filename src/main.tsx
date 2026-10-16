@@ -9,6 +9,7 @@ import {
   startAutoPriceSimulation,
   stopAutoPriceSimulation,
   simulateAllPriceChanges,
+  simulateOrderUpdate,
 } from "./lib/realtime";
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -44,6 +45,7 @@ if (typeof window !== "undefined") {
   (window as any).startAutoSimulation = startAutoPriceSimulation;
   (window as any).stopAutoSimulation = stopAutoPriceSimulation;
   (window as any).simulateAllPriceChanges = simulateAllPriceChanges;
+  (window as any).simulateOrderUpdate = simulateOrderUpdate;
 }
 enableMocking().then(() => {
   createRoot(document.getElementById("root")!).render(

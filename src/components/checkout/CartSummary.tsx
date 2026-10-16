@@ -1,11 +1,11 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
 import type { CartItem, Quote } from "@/types";
+import { useState } from "react";
 
 interface CartSummaryProps {
   cartItems: CartItem[];
-  quote: Quote;
+  quote: Quote | null | undefined;
   isLoadingQuote: boolean;
   couponError: string | null;
   onApplyCoupon: (coupon: string) => void;
@@ -25,10 +25,41 @@ export function CartSummary({
   isSubmitting,
 }: CartSummaryProps) {
   const [couponInput, setCouponInput] = useState("");
+
+  // 1. Calcula o subtotal direto dos itens do carrinho para comparar com a cotação
+  const currentCartSubtotal = cartItems.reduce(
+    (acc, item) => acc + parseFloat(item.price || "0") * item.quantity,
+    0,
+  );
+
+  // 2. Deteta se a cotação está desincronizada com o valor atual do carrinho
+  const isQuoteStale =
+    !!quote && Math.abs(currentCartSubtotal - quote.subtotal) > 0.0001;
+
+  // 3. Trava de segurança para desativar a compra com cotação inválida/desatualizada
+  const isButtonDisabled =
+    isSubmitting ||
+    isLoadingQuote ||
+    isQuoteStale ||
+    !quote ||
+    cartItems.length === 0;
+
   return (
     <div className="lg:col-span-5 space-y-6">
       <div className="p-6 bg-secondary/30 border border-border rounded-xl space-y-6">
         <h3 className="font-bold text-foreground font-mono">Seus NFTs</h3>
+
+        {/* ALERTA DE COTAÇÃO DESATUALIZADA / ALTERAÇÃO DE PREÇO */}
+        {(isLoadingQuote || isQuoteStale) && (
+          <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-yellow-500 text-xs font-mono flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 animate-pulse" />
+            <span>
+              {isLoadingQuote
+                ? "A recalcular a cotação em tempo real..."
+                : "O preço de um NFT mudou! A atualizar valores..."}
+            </span>
+          </div>
+        )}
 
         <div className="space-y-4 max-h-64 overflow-y-auto pr-2">
           {cartItems?.map((item) => (
@@ -58,7 +89,7 @@ export function CartSummary({
           ))}
         </div>
 
-        {/* CUPOM DE DESCONTO */}
+        {/* CUPÃO DE DESCONTO */}
         <div className="space-y-2">
           <div className="flex gap-2">
             <input
@@ -83,7 +114,7 @@ export function CartSummary({
           )}
           {quote?.validCoupon && (
             <p className="text-[10px] text-primary font-mono">
-              Cupom {quote.validCoupon} aplicado com sucesso!
+              Cupão {quote.validCoupon} aplicado com sucesso!
             </p>
           )}
         </div>
@@ -99,7 +130,7 @@ export function CartSummary({
           <div className="flex justify-between">
             <span>Desconto</span>
             <span className="text-primary">
-              {quote?.discount > 0
+              {quote && quote.discount > 0
                 ? `(-) ${quote.discount.toFixed(2)} ETH`
                 : "0.00 ETH"}
             </span>
@@ -116,7 +147,7 @@ export function CartSummary({
           <span className="font-bold text-foreground">Total</span>
           <span className="text-lg font-bold text-primary">
             {isLoadingQuote
-              ? "Calculando..."
+              ? "A recalcular..."
               : `${quote?.total.toFixed(3) || "0.000"} ETH`}
           </span>
         </div>
@@ -148,11 +179,15 @@ export function CartSummary({
 
         <Button
           type="submit"
-          disabled={isSubmitting || isLoadingQuote || cartItems?.length === 0}
+          disabled={isButtonDisabled}
           className="w-full py-6 font-bold bg-primary text-primary-foreground hover:bg-primary/90 flex items-center justify-center gap-2"
         >
-          {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-          Confirmar compra
+          {(isSubmitting || isLoadingQuote) && (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          )}
+          {isLoadingQuote || isQuoteStale
+            ? "A recalcular cotação..."
+            : "Confirmar compra"}
         </Button>
       </div>
     </div>
