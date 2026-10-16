@@ -6,6 +6,7 @@ import HeroBanner from "@/components/home/HeroBanner";
 import SidebarFilters from "@/components/home/SidebarFilters";
 import NFTGridSection from "@/components/home/NFTGridSection";
 import BlogSection from "@/components/home/BlogSection";
+import { useSocket } from "@/hooks/useSocket";
 
 export const Route = createFileRoute("/")({
   // Tipagem e parsing da URL
@@ -26,7 +27,7 @@ export const Route = createFileRoute("/")({
 function Home() {
   // Pega os parâmetros validados da URL em tempo real
   const searchParams = Route.useSearch();
-
+  useSocket();
   // A Query depende dos searchParams. Se a URL mudar, a requisição refaz automaticamente!
   const { data, isLoading, isError } = useQuery({
     queryKey: ["nfts", searchParams],

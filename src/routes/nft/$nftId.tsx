@@ -10,7 +10,7 @@ import { useCart } from "@/hooks/useCart";
 function NFTDetails() {
   // Extraímos o ID da URL automaticamente e com tipagem segura!
   const { nftId } = Route.useParams();
-
+  const { addToCart } = useCart();
   const {
     data: nft,
     isLoading,
@@ -49,7 +49,6 @@ function NFTDetails() {
   const relatedNfts =
     allNfts?.filter((item: NFTItem) => item.id !== nftId).slice(0, 5) || [];
 
-  const { addToCart } = useCart();
   return (
     <main className="flex-1 container mx-auto px-4 md:px-8 py-12">
       {/* Breadcrumb de navegação */}
