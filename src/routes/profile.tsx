@@ -19,6 +19,7 @@ import {
   EyeOff,
   Check,
   Loader2,
+  Circle,
 } from "lucide-react";
 import type { UserProfile, WalletItem } from "@/types";
 import { useQueryClient } from "@tanstack/react-query";
@@ -66,12 +67,17 @@ function ProfilePage() {
   const [isSavingPassword, setIsSavingPassword] = useState(false);
 
   // Estados do Formulário de Carteira
+  const [editingWalletId, setEditingWalletId] = useState<string | null>(null);
   const [walletDisplayName, setWalletDisplayName] = useState("");
   const [walletNameAlias, setWalletNameAlias] = useState("");
   const [walletNetwork, setWalletNetwork] = useState("");
+  const [walletProfileName, setWalletProfileName] = useState("");
   const [walletAddress, setWalletAddress] = useState("");
+  const [walletEnsSecondary, setWalletEnsSecondary] = useState("");
   const [walletType, setWalletType] = useState("");
+  const [walletReferral, setWalletReferral] = useState("");
   const [walletEmail, setWalletEmail] = useState("");
+  const [walletEnsName, setWalletEnsName] = useState("");
   const [walletSuccess, setWalletSuccess] = useState(false);
 
   useEffect(() => {
@@ -137,38 +143,91 @@ function ProfilePage() {
     }
   };
 
-  // CRUD: Salvar Carteira
+  // Lógica de Formulário de Carteiras
+  const handleAddNewWallet = () => {
+    setEditingWalletId(null);
+    setWalletDisplayName("");
+    setWalletNameAlias("");
+    setWalletNetwork("");
+    setWalletProfileName("");
+    setWalletAddress("");
+    setWalletEnsSecondary("");
+    setWalletType("");
+    setWalletReferral("");
+    setWalletEmail("");
+    setWalletEnsName("");
+  };
+
+  const handleEditWallet = (w: WalletItem) => {
+    setEditingWalletId(w.id);
+    setWalletDisplayName(w.name);
+    setWalletNameAlias(""); // Limpa ou mapeia do seu objeto caso exista
+    setWalletNetwork(w.network);
+    setWalletAddress(w.address);
+    // Demais campos podem ser mapeados aqui se adicionados ao tipo WalletItem
+
+    // Rola a página para o formulário
+    document
+      .getElementById("wallet-form-section")
+      ?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const handleDuplicatePrimary = async () => {
+    const primary = wallets.find((w) => w.isPrimary);
+    if (!primary) {
+      alert("Nenhuma carteira principal encontrada para duplicar.");
+      return;
+    }
+
+    const duplicatedWallet: WalletItem = {
+      ...primary,
+      id: Date.now().toString(),
+      name: `${primary.name} (Secundária)`,
+      isPrimary: false,
+    };
+
+    try {
+      await saveWallet(duplicatedWallet);
+      setWalletSuccess(true);
+      setTimeout(() => setWalletSuccess(false), 3000);
+    } catch {
+      alert("Erro ao duplicar carteira principal.");
+    }
+  };
+
   const handleSaveWallet = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!walletAddress || !walletNetwork) return;
 
-    const newWallet: WalletItem = {
-      id: Date.now().toString(),
+    // Se estiver a editar, preserva a flag isPrimary; senão, a primeira é sempre principal
+    const isPrimaryFlag = editingWalletId
+      ? wallets.find((w) => w.id === editingWalletId)?.isPrimary || false
+      : wallets.length === 0;
+
+    const walletPayload: WalletItem = {
+      id: editingWalletId || Date.now().toString(),
       name: walletDisplayName || "Nova Carteira",
       address: walletAddress,
       network: walletNetwork,
-      isPrimary: wallets.length === 0,
+      isPrimary: isPrimaryFlag,
     };
 
     try {
-      await saveWallet(newWallet);
+      await saveWallet(walletPayload);
       setWalletSuccess(true);
-      setWalletAddress("");
-      setWalletDisplayName("");
-      setWalletNameAlias("");
+      handleAddNewWallet(); // Limpa o formulário após salvar com sucesso
       setTimeout(() => setWalletSuccess(false), 3000);
     } catch {
       alert("Erro ao salvar carteira.");
     }
   };
 
-  // TELA DE SKELETON (Enquanto os dados do usuário são autenticados/carregados)
+  // TELA DE SKELETON (Enquanto os dados do usuário carregam)
   if (isLoadingAuth || (!user && activeTab === "profile")) {
     return (
       <main
         aria-busy="true"
         aria-live="polite"
-        aria-label="Carregando dados do perfil"
         className="flex-1 container mx-auto px-4 md:px-8 py-10 font-mono"
       >
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
@@ -250,7 +309,7 @@ function ProfilePage() {
               <span>Carteiras</span>
             </button>
 
-            {/* Links Desativados (Atalhos informativos) */}
+            {/* Links Desativados */}
             <div
               role="group"
               aria-label="Recursos em breve"
@@ -309,7 +368,9 @@ function ProfilePage() {
 
         {/* CONTEÚDO DIREITO */}
         <section className="md:col-span-9 space-y-8">
-          {/* ABA 1: DADOS DO PERFIL */}
+          {/* ==================================
+              ABA 1: DADOS DO PERFIL
+          ================================== */}
           {activeTab === "profile" && (
             <div
               id="panel-profile"
@@ -328,7 +389,7 @@ function ProfilePage() {
                       htmlFor="profile-display-name"
                       className="text-muted-foreground block mb-2"
                     >
-                      Nome de exibição*
+                      Nome de exibição<span className="text-primary">*</span>
                     </label>
                     <input
                       id="profile-display-name"
@@ -345,7 +406,7 @@ function ProfilePage() {
                       htmlFor="profile-username"
                       className="text-muted-foreground block mb-2"
                     >
-                      Nome de usuário*
+                      Nome de usuário<span className="text-primary">*</span>
                     </label>
                     <input
                       id="profile-username"
@@ -365,7 +426,7 @@ function ProfilePage() {
                       htmlFor="profile-email"
                       className="text-muted-foreground block mb-2"
                     >
-                      E-mail*
+                      E-mail<span className="text-primary">*</span>
                     </label>
                     <input
                       id="profile-email"
@@ -512,7 +573,7 @@ function ProfilePage() {
                       htmlFor="current-password"
                       className="text-muted-foreground block mb-2"
                     >
-                      Senha atual*
+                      Senha atual<span className="text-primary">*</span>
                     </label>
                     <div className="relative">
                       <input
@@ -548,7 +609,7 @@ function ProfilePage() {
                       htmlFor="new-password"
                       className="text-muted-foreground block mb-2"
                     >
-                      Nova senha*
+                      Nova senha<span className="text-primary">*</span>
                     </label>
                     <input
                       id="new-password"
@@ -566,7 +627,8 @@ function ProfilePage() {
                       htmlFor="confirm-password"
                       className="text-muted-foreground block mb-2"
                     >
-                      Confirmar nova senha*
+                      Confirmar nova senha
+                      <span className="text-primary">*</span>
                     </label>
                     <input
                       id="confirm-password"
@@ -607,34 +669,51 @@ function ProfilePage() {
             </div>
           )}
 
-          {/* ABA 2: CARTEIRAS */}
+          {/* ==================================
+              ABA 2: CARTEIRAS
+          ================================== */}
           {activeTab === "wallets" && (
             <div
               id="panel-wallets"
               role="tabpanel"
               aria-labelledby="tab-wallets"
-              className="space-y-8 animate-fadeIn"
+              className="space-y-10 animate-fadeIn"
             >
+              {/* CABEÇALHO COM BOTÃO "ADICIONAR" */}
               <div className="flex justify-between items-start border-b border-border/40 pb-4">
                 <div>
                   <h1 className="text-xl font-bold text-foreground">
-                    Gerenciar carteiras
+                    Carteira principal
                   </h1>
                   <p className="text-xs text-muted-foreground mt-1">
                     Estas carteiras ficam disponíveis no pagamento e para
                     receber NFTs comprados.
                   </p>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleAddNewWallet}
+                  aria-label="Adicionar nova carteira e limpar formulário"
+                  className="text-primary font-bold text-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded px-2 py-1"
+                >
+                  Adicionar
+                </button>
               </div>
 
-              <form onSubmit={handleSaveWallet} className="space-y-6 text-xs">
+              {/* FORMULÁRIO FIEL AO FIGMA */}
+              <form
+                id="wallet-form-section"
+                onSubmit={handleSaveWallet}
+                className="space-y-6 text-xs"
+              >
+                {/* Linha 1 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label
                       htmlFor="wallet-display-name"
                       className="text-muted-foreground block mb-2"
                     >
-                      Nome de exibição*
+                      Nome de exibição<span className="text-primary">*</span>
                     </label>
                     <input
                       id="wallet-display-name"
@@ -643,7 +722,7 @@ function ProfilePage() {
                       aria-required="true"
                       value={walletDisplayName}
                       onChange={(e) => setWalletDisplayName(e.target.value)}
-                      className="w-full bg-secondary/30 border border-border rounded-md px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      className="w-full bg-secondary/20 border border-border rounded px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
                     />
                   </div>
                   <div>
@@ -651,7 +730,7 @@ function ProfilePage() {
                       htmlFor="wallet-alias"
                       className="text-muted-foreground block mb-2"
                     >
-                      Apelido da carteira*
+                      Apelido da carteira<span className="text-primary">*</span>
                     </label>
                     <input
                       id="wallet-alias"
@@ -660,18 +739,19 @@ function ProfilePage() {
                       aria-required="true"
                       value={walletNameAlias}
                       onChange={(e) => setWalletNameAlias(e.target.value)}
-                      className="w-full bg-secondary/30 border border-border rounded-md px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      className="w-full bg-secondary/20 border border-border rounded px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
                     />
                   </div>
                 </div>
 
+                {/* Linha 2 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label
                       htmlFor="wallet-network-select"
                       className="text-muted-foreground block mb-2"
                     >
-                      Rede *
+                      Rede <span className="text-primary">*</span>
                     </label>
                     <select
                       id="wallet-network-select"
@@ -679,7 +759,7 @@ function ProfilePage() {
                       aria-required="true"
                       value={walletNetwork}
                       onChange={(e) => setWalletNetwork(e.target.value)}
-                      className="w-full bg-secondary/30 border border-border rounded-md px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      className="w-full bg-secondary/20 border border-border rounded px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary appearance-none"
                     >
                       <option value="">Selecione uma rede</option>
                       <option value="Ethereum">Ethereum</option>
@@ -692,23 +772,29 @@ function ProfilePage() {
                       htmlFor="wallet-profile-name"
                       className="text-muted-foreground block mb-2"
                     >
-                      Nome do perfil (opcional)
+                      Nome do perfil<span className="text-primary">*</span>
                     </label>
                     <input
                       id="wallet-profile-name"
                       type="text"
-                      className="w-full bg-secondary/30 border border-border rounded-md px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      required
+                      aria-required="true"
+                      value={walletProfileName}
+                      onChange={(e) => setWalletProfileName(e.target.value)}
+                      className="w-full bg-secondary/20 border border-border rounded px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
                     />
                   </div>
                 </div>
 
+                {/* Linha 3 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label
                       htmlFor="wallet-address-input"
                       className="text-muted-foreground block mb-2"
                     >
-                      Endereço da carteira*
+                      Endereço da carteira
+                      <span className="text-primary">*</span>
                     </label>
                     <input
                       id="wallet-address-input"
@@ -718,7 +804,7 @@ function ProfilePage() {
                       placeholder="Endereço 0x da carteira"
                       value={walletAddress}
                       onChange={(e) => setWalletAddress(e.target.value)}
-                      className="w-full bg-secondary/30 border border-border rounded-md px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary font-mono"
+                      className="w-full bg-secondary/20 border border-border rounded px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary font-mono"
                     />
                   </div>
                   <div>
@@ -731,24 +817,29 @@ function ProfilePage() {
                     <input
                       id="wallet-ens-secondary"
                       type="text"
-                      className="w-full bg-secondary/30 border border-border rounded-md px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      value={walletEnsSecondary}
+                      onChange={(e) => setWalletEnsSecondary(e.target.value)}
+                      className="w-full bg-secondary/20 border border-border rounded px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
                     />
                   </div>
                 </div>
 
+                {/* Linha 4 */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label
                       htmlFor="wallet-type-select"
                       className="text-muted-foreground block mb-2"
                     >
-                      Tipo de carteira (opcional)
+                      Tipo de carteira<span className="text-primary">*</span>
                     </label>
                     <select
                       id="wallet-type-select"
+                      required
+                      aria-required="true"
                       value={walletType}
                       onChange={(e) => setWalletType(e.target.value)}
-                      className="w-full bg-secondary/30 border border-border rounded-md px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      className="w-full bg-secondary/20 border border-border rounded px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary appearance-none"
                     >
                       <option value="">Selecione uma carteira</option>
                       <option value="MetaMask">MetaMask</option>
@@ -758,27 +849,76 @@ function ProfilePage() {
                   </div>
                   <div>
                     <label
-                      htmlFor="wallet-email-input"
+                      htmlFor="wallet-referral"
                       className="text-muted-foreground block mb-2"
                     >
-                      E-mail do proprietário (opcional)
+                      Código de indicação<span className="text-primary">*</span>
                     </label>
                     <input
-                      id="wallet-email-input"
-                      type="email"
-                      value={walletEmail}
-                      onChange={(e) => setWalletEmail(e.target.value)}
-                      className="w-full bg-secondary/30 border border-border rounded-md px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      id="wallet-referral"
+                      type="text"
+                      required
+                      aria-required="true"
+                      value={walletReferral}
+                      onChange={(e) => setWalletReferral(e.target.value)}
+                      className="w-full bg-secondary/20 border border-border rounded px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4">
+                {/* Linha 5 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label
+                      htmlFor="wallet-email-input"
+                      className="text-muted-foreground block mb-2"
+                    >
+                      E-mail<span className="text-primary">*</span>
+                    </label>
+                    <input
+                      id="wallet-email-input"
+                      type="email"
+                      required
+                      aria-required="true"
+                      value={walletEmail}
+                      onChange={(e) => setWalletEmail(e.target.value)}
+                      className="w-full bg-secondary/20 border border-border rounded px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="wallet-ens-name-input"
+                      className="text-muted-foreground block mb-2"
+                    >
+                      Nome ENS <span className="text-primary">*</span>
+                    </label>
+                    <div className="flex gap-2">
+                      <select
+                        aria-label="Extensão ENS"
+                        className="w-24 bg-secondary/20 border border-border rounded px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary appearance-none"
+                      >
+                        <option>.eth</option>
+                      </select>
+                      <input
+                        id="wallet-ens-name-input"
+                        type="text"
+                        required
+                        aria-required="true"
+                        value={walletEnsName}
+                        onChange={(e) => setWalletEnsName(e.target.value)}
+                        className="flex-1 bg-secondary/20 border border-border rounded px-3 py-2.5 text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Botão de Salvar */}
+                <div className="pt-2 flex items-center gap-4">
                   <Button
                     type="submit"
                     disabled={isSavingWallet}
                     aria-busy={isSavingWallet}
-                    className="bg-primary text-primary-foreground font-bold px-8 py-5 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    className="bg-primary text-primary-foreground font-bold px-6 py-2.5 rounded hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                   >
                     {isSavingWallet ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -791,43 +931,85 @@ function ProfilePage() {
                       role="status"
                       className="text-xs text-primary flex items-center gap-1"
                     >
-                      <Check className="w-4 h-4" /> Carteira cadastrada com
-                      sucesso!
+                      <Check className="w-4 h-4" />
+                      {editingWalletId
+                        ? "Carteira atualizada!"
+                        : "Carteira adicionada!"}
                     </span>
                   )}
                 </div>
               </form>
 
-              {/* LISTA DE CARTEIRAS CADASTRADAS */}
+              {/* SESSÃO: CARTEIRA SECUNDÁRIA (CLONAR) */}
+              <div className="pt-8 border-t border-border/40 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+                <div>
+                  <h2 className="text-base font-bold text-foreground">
+                    Carteira secundária
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {wallets.length <= 1
+                      ? "Você ainda não adicionou uma carteira secundária."
+                      : "Gira as suas carteiras secundárias abaixo."}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 text-xs">
+                  <div className="flex items-center gap-2" aria-hidden="true">
+                    <Circle className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">
+                      Igual à carteira principal
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDuplicatePrimary}
+                    aria-label="Adicionar uma cópia da sua carteira principal como secundária"
+                    className="text-primary font-bold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded px-1"
+                  >
+                    Adicionar
+                  </button>
+                </div>
+              </div>
+
+              {/* LISTA DE CARTEIRAS CADASTRADAS (CLICÁVEIS PARA EDITAR) */}
               <div className="pt-8 border-t border-border/40 space-y-4">
                 <h2 className="text-base font-bold text-foreground">
                   Carteiras cadastradas ({wallets.length})
                 </h2>
                 {wallets.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
-                    Você ainda não adicionou carteiras.
+                    Nenhuma carteira salva até o momento.
                   </p>
                 ) : (
                   <div
                     role="region"
-                    aria-label="Lista de carteiras salvas"
+                    aria-label="Lista de carteiras salvas para edição"
                     className="space-y-3"
                   >
                     {wallets.map((w) => (
                       <div
                         key={w.id}
-                        className="p-4 bg-secondary/20 border border-border rounded-lg flex items-center justify-between text-xs"
+                        onClick={() => handleEditWallet(w)}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Editar carteira ${w.name}`}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleEditWallet(w);
+                          }
+                        }}
+                        className="p-4 bg-secondary/10 border border-border/40 rounded-lg flex items-center justify-between text-xs cursor-pointer hover:border-primary/50 hover:bg-secondary/20 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                       >
                         <div>
                           <p className="font-bold text-foreground">
-                            {w.name}{" "}
+                            {w.name}
                             {w.isPrimary && (
                               <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded ml-2">
                                 PRINCIPAL
                               </span>
                             )}
                           </p>
-                          <p className="text-muted-foreground text-[11px]">
+                          <p className="text-muted-foreground text-[11px] mt-1">
                             {w.address} • {w.network}
                           </p>
                         </div>
@@ -836,7 +1018,10 @@ function ProfilePage() {
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => setPrimaryWallet(w.id)}
+                            onClick={(e) => {
+                              e.stopPropagation(); // Evita ativar a edição ao clicar em "Tornar principal"
+                              setPrimaryWallet(w.id);
+                            }}
                             aria-label={`Definir ${w.name} como carteira principal`}
                             className="text-xs border-border hover:text-primary hover:border-primary focus-visible:ring-2 focus-visible:ring-primary"
                           >

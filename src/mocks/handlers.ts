@@ -9,8 +9,18 @@ import type {
   ChangePasswordRequestBody,
   WalletItem,
   OrderSnapshot,
+  OrderItem,
 } from "@/types";
 import { scenarioManager } from "./scenarios";
+
+function isSessionValid(request: Request) {
+  const authHeader = request.headers.get("Authorization");
+  // Simula validação: se não tem Bearer token ou se for um token "expirado" fictício
+  if (!authHeader || authHeader === "Bearer token_expirado") {
+    return false;
+  }
+  return true;
+}
 
 export const handlers = [
   // ---------------------------------------------------------------------------
@@ -256,6 +266,12 @@ export const handlers = [
   // Atualizar Perfil
   http.put("/api/profile", async ({ request }) => {
     await delay(300);
+    if (!isSessionValid(request)) {
+      return new HttpResponse(JSON.stringify({ message: "Sessão expirada" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     const body = (await request.json()) as UpdateProfileRequestBody;
     const data = db.read();
 
@@ -272,6 +288,12 @@ export const handlers = [
   // Alterar Senha
   http.put("/api/profile/password", async ({ request }) => {
     await delay(300);
+    if (!isSessionValid(request)) {
+      return new HttpResponse(JSON.stringify({ message: "Sessão expirada" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     const body = (await request.json()) as ChangePasswordRequestBody;
     const data = db.read();
 
@@ -290,8 +312,14 @@ export const handlers = [
   }),
 
   // Carteiras
-  http.get("/api/wallets", async () => {
+  http.get("/api/wallets", async ({ request }) => {
     await delay(200);
+    if (!isSessionValid(request)) {
+      return new HttpResponse(JSON.stringify({ message: "Sessão expirada" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     const data = db.read();
     const wallets =
       ((data as unknown as Record<string, unknown>).wallets as WalletItem[]) ||
@@ -301,6 +329,12 @@ export const handlers = [
 
   http.post("/api/wallets", async ({ request }) => {
     await delay(300);
+    if (!isSessionValid(request)) {
+      return new HttpResponse(JSON.stringify({ message: "Sessão expirada" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     const wallet = (await request.json()) as WalletItem;
     const data = db.read();
     const currentWallets =
@@ -318,8 +352,14 @@ export const handlers = [
     return HttpResponse.json({ wallets: currentWallets });
   }),
 
-  http.put("/api/wallets/:id/primary", async ({ params }) => {
+  http.put("/api/wallets/:id/primary", async ({ params, request }) => {
     await delay(200);
+    if (!isSessionValid(request)) {
+      return new HttpResponse(JSON.stringify({ message: "Sessão expirada" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     const { id } = params;
     const data = db.read();
     const currentWallets =
@@ -413,6 +453,12 @@ export const handlers = [
   // Criação do Pedido com Chave de Idempotência e Snapshot
   http.post("/api/orders", async ({ request }) => {
     await delay(800); // Simulando o tempo de processamento de pagamento
+    if (!isSessionValid(request)) {
+      return new HttpResponse(JSON.stringify({ message: "Sessão expirada" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     const scenario = scenarioManager.getScenario();
 
     // 1. CENÁRIO: Lentidão Extrema (Delay de 5 segundos)
@@ -499,10 +545,16 @@ export const handlers = [
     return HttpResponse.json({ order: newOrder });
   }),
 
-  http.get("/api/orders/:id", ({ params }) => {
+  http.get("/api/orders/:id", ({ params, request }) => {
+    if (!isSessionValid(request)) {
+      return new HttpResponse(JSON.stringify({ message: "Sessão expirada" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     const { id } = params;
     const data = db.read();
-    const orders = (data.orders as any[]) || [];
+    const orders = (data.orders as OrderItem[]) || [];
     const order = orders.find((o) => o.id === id);
 
     if (!order) {
