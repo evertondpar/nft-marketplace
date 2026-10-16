@@ -210,6 +210,45 @@ export const handlers = [
     return HttpResponse.json({ success: true, cart: currentCart });
   }),
 
+  // ALTERAR ITEM DO CARRINHO (Quantidade)
+  http.patch("api/cart/:id", async ({ params, request }) => {
+    const { id } = params;
+    const { quantity } = (await request.json()) as { quantity: number };
+
+    const data = db.read();
+    let cart = (data.cart as CartItem[]) || [];
+    console.log("id e quantidade recebidos:", id, quantity);
+    const itemIndex = cart.findIndex((item) => item.id === id);
+
+    if (itemIndex > -1) {
+      if (quantity <= 0) {
+        // Se a quantidade chegar a 0, remove o item
+        cart = cart.filter((item) => item.id !== id);
+      } else {
+        cart[itemIndex].quantity = quantity;
+      }
+      db.write({ cart });
+      return HttpResponse.json({ items: cart });
+    }
+
+    return new HttpResponse(
+      JSON.stringify({ message: "Item não encontrado" }),
+      { status: 404 },
+    );
+  }),
+
+  // REMOVER ITEM DO CARRINHO
+  http.delete("api/cart/:id", ({ params }) => {
+    const { id } = params;
+    const data = db.read();
+    const cart = (data.cart as CartItem[]) || [];
+
+    const newCart = cart.filter((item) => item.id !== id);
+    db.write({ cart: newCart });
+
+    return HttpResponse.json({ items: newCart });
+  }),
+
   // ---------------------------------------------------------------------------
   // 4. PERFIL E CARTEIRAS
   // ---------------------------------------------------------------------------

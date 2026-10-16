@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
@@ -12,6 +12,8 @@ export const Route = createFileRoute("/cart")({
 });
 
 function CartPage() {
+  const queryClient = useQueryClient();
+
   const { data: cartItems, isLoading } = useQuery({
     queryKey: ["cart"],
     queryFn: async () => {
@@ -19,6 +21,42 @@ function CartPage() {
       return res.data.items;
     },
   });
+
+  const updateQuantityMutation = useMutation({
+    mutationFn: async ({ id, quantity }: { id: string; quantity: number }) => {
+      await api.patch(`/cart/${id}`, { quantity });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cart"] });
+    },
+  });
+
+  // Mutação para Remover Item
+  const removeItemMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/cart/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cart"] });
+    },
+  });
+
+  // Funções de ação
+  const handleIncrease = (id: string, currentQty: number) => {
+    updateQuantityMutation.mutate({ id, quantity: currentQty + 1 });
+  };
+
+  const handleDecrease = (id: string, currentQty: number) => {
+    if (currentQty > 1) {
+      updateQuantityMutation.mutate({ id, quantity: currentQty - 1 });
+    } else {
+      removeItemMutation.mutate(id);
+    }
+  };
+
+  const handleRemove = (id: string) => {
+    removeItemMutation.mutate(id);
+  };
 
   // Estado para controlar o carregamento individual das imagens das NFTs no carrinho
   const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({});
@@ -187,8 +225,10 @@ function CartPage() {
                     <div className="col-span-2 flex items-center justify-center gap-2">
                       <button
                         type="button"
+                        onClick={() => handleDecrease(item.id, item.quantity)}
+                        disabled={updateQuantityMutation.isPending}
                         aria-label={`Diminuir quantidade de ${item.name}`}
-                        className="w-6 h-6 rounded bg-background border border-border text-primary font-bold hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        className="w-6 h-6 rounded bg-background border border-border text-primary font-bold hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
                       >
                         -
                       </button>
@@ -200,8 +240,10 @@ function CartPage() {
                       </span>
                       <button
                         type="button"
+                        onClick={() => handleIncrease(item.id, item.quantity)}
+                        disabled={updateQuantityMutation.isPending}
                         aria-label={`Aumentar quantidade de ${item.name}`}
-                        className="w-6 h-6 rounded bg-background border border-border text-primary font-bold hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        className="w-6 h-6 rounded bg-background border border-border text-primary font-bold hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
                       >
                         +
                       </button>
@@ -212,8 +254,10 @@ function CartPage() {
                       <span>{itemTotal} ETH</span>
                       <button
                         type="button"
+                        onClick={() => handleRemove(item.id)}
+                        disabled={removeItemMutation.isPending}
                         aria-label={`Remover ${item.name} do carrinho`}
-                        className="text-muted-foreground hover:text-red-500 transition-colors p-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        className="text-muted-foreground hover:text-red-500 transition-colors p-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
