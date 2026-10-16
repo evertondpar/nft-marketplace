@@ -125,9 +125,11 @@ function CheckoutPage() {
           },
         },
       );
+
       return res.data.order as OrderSnapshot;
     },
     onSuccess: (orderSnapshot) => {
+      console.log("RESS ", orderSnapshot);
       if (orderSnapshot.status === "confirmed") {
         setConfirmedOrder(orderSnapshot);
         sessionStorage.removeItem("activeOrderId");
@@ -163,6 +165,9 @@ function CheckoutPage() {
 
   const isSubmitting = orderMutation.isPending || isReconciling;
 
+  useEffect(() => {
+    console.log("snapshot: ", confirmedOrder);
+  }, [confirmedOrder]);
   return (
     <main className="flex-1 container mx-auto px-4 md:px-8 py-12">
       <div className="text-sm font-mono text-muted-foreground mb-8">

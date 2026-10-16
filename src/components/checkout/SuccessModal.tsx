@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { X, ExternalLink } from "lucide-react";
 import type { OrderSnapshot } from "@/types";
+import { useEffect } from "react";
 interface SuccessModalProps {
   isOpen: boolean;
   onClose: () => void;

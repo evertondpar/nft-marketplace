@@ -160,19 +160,54 @@ if (typeof window !== "undefined") {
   (window as any).simulateAllPriceChanges = simulateAllPriceChanges;
 }
 
+// export function simulateOrderUpdate(
+//   orderId: string,
+//   status: "confirmed" | "rejected",
+// ) {
+//   console.log(
+//     `[Socket.IO Simulado] Atualizando pedido #${orderId} para ${status}`,
+//   );
+
+//   RealtimeServer.emit("order.updated", {
+//     orderId,
+//     status,
+//     version: Date.now(),
+//   });
+// }
+
 export function simulateOrderUpdate(
   orderId: string,
   status: "confirmed" | "rejected",
 ) {
-  console.log(
-    `[Socket.IO Simulado] Atualizando pedido #${orderId} para ${status}`,
-  );
+  const data = db.read();
+  const orders = [...((data.orders as any[]) || [])];
 
-  RealtimeServer.emit("order.updated", {
-    orderId,
-    status,
-    version: Date.now(),
-  });
+  const index = orders.findIndex((o) => o.id === orderId);
+
+  if (index !== -1) {
+    // 1. Atualiza o estado no banco de dados local (localStorage)
+    orders[index] = {
+      ...orders[index],
+      status,
+      version: Date.now(),
+    };
+
+    db.write({ orders });
+
+    const updatedOrder = orders[index];
+
+    console.log(
+      `[Socket.IO Simulado] Pedido #${orderId} alterado para ${status}`,
+    );
+
+    // 2. Transmite o evento com o snapshot atualizado do pedido
+    RealtimeServer.emit("order.updated", {
+      orderId,
+      status,
+      version: updatedOrder.version,
+      snapshot: updatedOrder, // Envia o snapshot completo do pedido
+    });
+  }
 }
 
 // Expõe na window para testes no console

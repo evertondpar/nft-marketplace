@@ -153,76 +153,35 @@ export function useSocket() {
           refetchType: "all",
         });
       }
-      // if (event === "nft.updated") {
-      //   console.log(
-      //     "⚡ Evento nft.updated recebido. Recarregando React Query...",
-      //     data,
-      //   );
-      //   // FORÇA O REACT QUERY A REFAZER O GET /api/nfts IMEDIATAMENTE!
-      //   // Como o localStorage já foi atualizado pelo simulatePriceChange, o novo GET traz os dados atualizados.
-      //   console.log("não recarregou");
-      //   queryClient.invalidateQueries({
-      //     predicate: (query) =>
-      //       query.queryKey[0] === "nfts" || query.queryKey[0] === "nft",
-      //   });
-      //   console.log(" recarregou");
+      // if (event === "order.updated") {
+      //   console.log("⚡ Evento order.updated recebido:", data);
 
-      //   // Alerta caso o item esteja no carrinho
-      //   const currentCart = queryClient.getQueryData<any[]>(["cart"]);
-      //   const isItemInCart = currentCart?.some((item) => item.id === data.id);
-
-      //   console.log(
-      //     "currentCart",
-      //     currentCart,
-      //     "isItemInCart",
-      //     isItemInCart,
-      //     "data",
-      //     data,
-      //   );
-
-      //   if (isItemInCart) {
-      //     setPriceChangeAlert(
-      //       `O preço de "${data.nft.name}" foi alterado para ${data.nft.price} ETH!`,
-      //     );
-      //     queryClient.invalidateQueries({ queryKey: ["quote"] });
-      //   }
-      // }
-      // if (event === "nft.updated") {
-      //   console.log("⚡ Evento nft.updated no Checkout:", data);
-
-      //   // 1. Atualiza as queries do catálogo/detalhes
-      //   queryClient.invalidateQueries({
-      //     queryKey: ["nfts"],
-      //     refetchType: "all",
-      //   });
-      //   queryClient.invalidateQueries({
-      //     queryKey: ["nft", data.id],
-      //     refetchType: "all",
+      //   queryClient.setQueryData(["order", data.orderId], (oldOrder: any) => {
+      //     // Proteção de estado terminal: se já estiver confirmado ou recusado, ignora eventos antigos
+      //     if (
+      //       oldOrder?.status === "confirmed" ||
+      //       oldOrder?.status === "rejected"
+      //     ) {
+      //       return oldOrder;
+      //     }
+      //     return {
+      //       ...oldOrder,
+      //       status: data.status,
+      //       version: data.version,
+      //     };
       //   });
 
-      //   // 2. FUNDAMENTAL PARA O CHECKOUT: Re-busca o carrinho para pegar os novos preços dos itens
-      //   queryClient.invalidateQueries({
-      //     queryKey: ["cart"],
-      //     refetchType: "all",
-      //   });
-
-      //   // 3. Força o recálculo imediato da cotação
-      //   queryClient.invalidateQueries({
-      //     queryKey: ["quote"],
-      //     refetchType: "all",
-      //   });
+      //   queryClient.invalidateQueries({ queryKey: ["order", data.orderId] });
       // }
       if (event === "order.updated") {
-        console.log("⚡ Evento order.updated recebido:", data);
-
         queryClient.setQueryData(["order", data.orderId], (oldOrder: any) => {
-          // Proteção de estado terminal: se já estiver confirmado ou recusado, ignora eventos antigos
-          if (
-            oldOrder?.status === "confirmed" ||
-            oldOrder?.status === "rejected"
-          ) {
-            return oldOrder;
+          // Se o evento trouxe o snapshot completo, usa ele
+          if (data.snapshot) {
+            return data.snapshot;
           }
+
+          if (!oldOrder) return oldOrder;
+
           return {
             ...oldOrder,
             status: data.status,

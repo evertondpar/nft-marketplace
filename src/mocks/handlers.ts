@@ -398,6 +398,8 @@ export const handlers = [
       networkFee: body.quote.networkFee,
       total: body.quote.total,
       wallet: body.wallet,
+      status: "pending",
+      version: 1,
       createdAt: new Date().toISOString(),
     };
 
@@ -408,5 +410,24 @@ export const handlers = [
     } as any);
 
     return HttpResponse.json({ order: newOrder });
+  }),
+
+  http.get("/api/orders/:id", ({ params }) => {
+    const { id } = params;
+    const data = db.read();
+    const orders = (data.orders as any[]) || [];
+    const order = orders.find((o) => o.id === id);
+
+    if (!order) {
+      return new HttpResponse(
+        JSON.stringify({ message: "Pedido não encontrado" }),
+        {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    return HttpResponse.json(order);
   }),
 ];
