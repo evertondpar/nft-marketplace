@@ -29,10 +29,6 @@ declare module "@tanstack/react-router" {
 }
 
 async function enableMocking() {
-  if (!import.meta.env.DEV) {
-    return;
-  }
-
   const { worker } = await import("./mocks/browser");
 
   // Isso inicia o Service Worker no navegador
