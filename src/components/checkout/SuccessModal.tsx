@@ -233,10 +233,7 @@ export function SuccessModal({
           </p>
 
           <div className="mt-5 flex justify-center">
-            <Button
-              asChild
-              className="h-12 w-[186px] rounded-sm bg-primary font-mono text-base font-bold text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-            >
+            <Button className="h-12 w-[186px] rounded-sm bg-primary font-mono text-base font-bold text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
               <Link to="/" onClick={onClose}>
                 Ver no Etherscan
               </Link>

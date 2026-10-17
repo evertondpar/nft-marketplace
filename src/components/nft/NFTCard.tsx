@@ -13,6 +13,7 @@ export function NFTCard({
   originalPrice,
   currency,
   image,
+  ...rest
 }: NFTItem) {
   const { addToCart, isAdding } = useCart();
   const { favorites, toggleFavorite } = useFavorites();
@@ -24,7 +25,7 @@ export function NFTCard({
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault(); // Evita navegar para a tela de detalhes ao clicar no botão
     e.stopPropagation();
-    addToCart({ id, name, price, originalPrice, currency, image });
+    addToCart({ id, name, price, originalPrice, currency, image, ...rest });
   };
 
   const handleToggleFavorite = (e: React.MouseEvent) => {

@@ -18,44 +18,19 @@ interface MockDatabase {
   currentUser: UserProfile | null;
   token: string | null;
   favorites: string[];
-  orders: [];
+  orders: any[];
 }
 
 const defaultDB: MockDatabase = {
   nfts: nftsData, // Depois vamos preencher com fixtures
-  cart: [
-    // {
-    //   id: "0042",
-    //   name: "Emerald Ape",
-    //   price: "1.19",
-    //   currency: "ETH",
-    //   image: "https://i.pravatar.cc/500?img=11",
-    //   quantity: 2,
-    // },
-    // {
-    //   id: "0314",
-    //   name: "Violet Nomad",
-    //   price: "1.39",
-    //   currency: "ETH",
-    //   image: "https://i.pravatar.cc/500?img=12",
-    //   quantity: 6,
-    // },
-    // {
-    //   id: "0088",
-    //   name: "Ivory Baron",
-    //   price: "1.79",
-    //   currency: "ETH",
-    //   image: "https://i.pravatar.cc/500?img=13",
-    //   quantity: 9,
-    // },
-  ],
+  cart: [],
   users: [
     {
       id: "user-1",
       name: "Satoshi Nakamoto",
       username: "satoshi",
-      email: "contato@email.com",
-      password: "password123",
+      email: "admin@kurio.com",
+      password: "123456",
       avatar: "https://i.pravatar.cc/150?img=3",
     },
   ],

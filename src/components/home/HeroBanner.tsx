@@ -14,7 +14,7 @@ interface HeroBannerProps {
 
 export default function HeroBanner({
   isLoading = false,
-  imageUrl = "https://i.pravatar.cc/600?img=11",
+  imageUrl = "/monkey1.png",
   secondaryImageUrl = "https://i.pravatar.cc/200?img=12",
   title,
   description,

@@ -49,7 +49,7 @@ export default function SidebarFilters({
   currentParams,
   currentPage,
   totalPages,
-  featuredImage = "https://i.pravatar.cc/400?img=12",
+  featuredImage = "/monkey3.png",
 }: SidebarFiltersProps) {
   const navigate = useNavigate({ from: "/" });
 

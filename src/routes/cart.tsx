@@ -480,10 +480,7 @@ function CartPage() {
             </span>
           </div>
 
-          <Button
-            asChild
-            className="mt-4 h-10 w-full rounded-sm bg-primary font-mono text-sm font-bold text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-          >
+          <Button className="mt-4 h-10 w-full rounded-sm bg-primary font-mono text-sm font-bold text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
             <Link to="/checkout">Conectar e finalizar</Link>
           </Button>
 
@@ -607,10 +604,7 @@ function CartPage() {
           </span>
         </div>
 
-        <Button
-          asChild
-          className="mt-6 h-[60px] w-full rounded-full bg-gradient-to-br from-primary to-primary/60 font-mono text-base font-bold text-primary-foreground hover:opacity-90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-        >
+        <Button className="mt-6 h-[60px] w-full rounded-full bg-gradient-to-br from-primary to-primary/60 font-mono text-base font-bold text-primary-foreground hover:opacity-90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background">
           <Link to="/checkout">Conectar e finalizar</Link>
         </Button>
       </aside>

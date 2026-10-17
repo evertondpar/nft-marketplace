@@ -15,25 +15,25 @@ interface BlogSectionProps {
 
 const defaultPosts: Post[] = [
   {
-    img: "13",
+    img: "/monkey1.png",
     title: "Como funciona a propriedade de NFTs",
     excerpt: "Aprenda a colecionar, negociar e verificar ativos digitais.",
     time: "12 de setembro | Leitura de 6 min",
   },
   {
-    img: "14",
+    img: "/monkey2.png",
     title: "10 artistas digitais para acompanhar",
     excerpt: "Conheça criadores que moldam a cultura digital.",
     time: "13 de setembro | Leitura de 2 min",
   },
   {
-    img: "15",
+    img: "/monkey3.png",
     title: "Raridade, atributos e procedência",
     excerpt: "Entenda raridade, procedência, direitos autorais e utilidade.",
     time: "15 de setembro | Leitura de 3 min",
   },
   {
-    img: "16",
+    img: "/monkey4.png",
     title: "Como proteger sua carteira",
     excerpt: "Proteja sua carteira, seus ativos e sua identidade.",
     time: "15 de setembro | Leitura de 2 min",
@@ -99,11 +99,7 @@ export default function BlogSection({
                     <Skeleton className="absolute inset-0 w-full h-full" />
                   )}
                   <img
-                    src={
-                      post.img.startsWith("http")
-                        ? post.img
-                        : `https://i.pravatar.cc/400?img=${post.img}`
-                    }
+                    src={post.img}
                     alt={`Imagem do artigo: ${post.title}`}
                     onLoad={() => handleImageLoad(i)}
                     className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${

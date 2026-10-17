@@ -17,7 +17,7 @@ interface NFTGridSectionProps {
 
 const defaultBanners: Banner[] = [
   {
-    img: "https://i.pravatar.cc/400?img=11",
+    img: "/monkey1.png",
     alt: "Arte NFT da coleção Lançamentos Gênesis",
     title: (
       <>
@@ -31,7 +31,7 @@ const defaultBanners: Banner[] = [
     ariaLabel: "Explorar lançamentos gênesis",
   },
   {
-    img: "https://i.pravatar.cc/400?img=12",
+    img: "/monkey2.png",
     alt: "Arte NFT da coleção de arte digital selecionada",
     title: (
       <>
