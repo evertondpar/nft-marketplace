@@ -101,21 +101,6 @@ export default function HeroBanner({
               }`}
             />
           </div>
-          {/* Miniatura sobreposta */}
-          <div className="absolute -bottom-2 left-0 w-[70px] h-[58px] rounded-xl overflow-hidden border-[3px] border-secondary bg-background/40">
-            {!isThumbLoaded && (
-              <Skeleton className="absolute inset-0 w-full h-full" />
-            )}
-            <img
-              src={secondaryImageUrl}
-              alt=""
-              aria-hidden="true"
-              onLoad={() => setIsThumbLoaded(true)}
-              className={`w-full h-full object-cover transition-opacity duration-300 ${
-                isThumbLoaded ? "opacity-100" : "opacity-0"
-              }`}
-            />
-          </div>
         </div>
 
         {/* Indicadores decorativos */}
