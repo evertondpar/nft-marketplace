@@ -5,7 +5,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 interface HeroBannerProps {
   isLoading?: boolean;
   imageUrl?: string;
-  secondaryImageUrl?: string;
   title?: string;
   description?: string;
   mobileTitle?: string;
@@ -15,14 +14,12 @@ interface HeroBannerProps {
 export default function HeroBanner({
   isLoading = false,
   imageUrl = "/monkey1.png",
-  secondaryImageUrl = "https://i.pravatar.cc/200?img=12",
   title,
   description,
   mobileTitle = "SEJA DONO DA CULTURA DIGITAL",
   mobileDescription = "Descubra NFTs selecionados de criadores do mundo todo.",
 }: HeroBannerProps) {
   const [isImageLoaded, setIsImageLoaded] = useState(false);
-  const [isThumbLoaded, setIsThumbLoaded] = useState(false);
 
   if (isLoading) {
     return (
